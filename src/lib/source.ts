@@ -2,17 +2,15 @@ import { FragmentCodeDetail } from "@/components/CodeContent";
 import { ExecResult } from "@ethereumjs/evm";
 import { cloneDeep } from "lodash";
 import { VariableDeclaration } from "solidity-ast";
-import { SolcOutput } from "solidity-ast/solc";
-import { astDereferencer, findAll } from "solidity-ast/utils";
 import { decodeAbiParameters } from "viem";
 import { solidityCompiler } from "./compiler";
 import { defaultTemplate } from "./contract";
+import { getOpcodeKey } from "./contract/opcodes";
 import { decodeInstructions, Instruction } from "./contract/source_map";
 import { CodeType, CompiledContract, SourceType } from "./types";
-import { filterNode, findVariables, getContractNode, searchInspector, searchInspectorType, searchRunVariables } from "./utils";
+import { getContractNode, searchInspectorType, searchRunVariables } from "./utils";
 import { getLastStackValue } from "./vm";
-import { getOpcodeKey } from "./contract/opcodes";
-const VERSION = "soljson-v0.8.17+commit.8df45f5f.js"
+const VERSION = "soljson-v0.8.20+commit.a1b79de6.js"
 
 export type CompileResult = {
   type: CodeType,
@@ -37,7 +35,10 @@ export class Source {
   private code: string[] = [];
   private topLevelCode: string[] = [];
   private globalCode: string[] = [];
+  private imports: string[] = [];
   private dry = false;
+  private sourceType: SourceType = SourceType.Normal;
+  private appendCode: string[] = [];
 
   private variables: Map<string, VariableDeclaration> = new Map()
   private sourceMap: Instruction[] | null = null
@@ -60,9 +61,13 @@ export class Source {
     )
   }
 
-
-  clone() {
+  rawClone() {
     return cloneDeep(this)
+  }
+  clone() {
+    const clone = this.rawClone()
+    clone.appendCode = []
+    return clone
   }
 
   addCode(detailCode: FragmentCodeDetail) {
@@ -84,7 +89,7 @@ export class Source {
 
   pushGlobalCode(input: string[]) {
     this.globalCode.push(...input);
-    this.setDry(false);
+    this.setDry(true);
   }
 
   pushTopLevelCode(input: string[]) {
@@ -92,7 +97,17 @@ export class Source {
     this.setDry(true);
   }
 
-  toContractSource() {
+  pushImport(input: string[]) {
+    this.imports.push(...input);
+    this.setDry(true);
+  }
+
+  setAppendCode(input: string[]) {
+    this.appendCode = input;
+    this.setDry(true);
+  }
+
+  toContractSource(useAppendCode = false) {
     if (!this.dry) {
       return this.source;
     }
@@ -100,10 +115,10 @@ export class Source {
     this.setDry(false);
     this.source = defaultTemplate({
       contractName: "MoldityBox",
-      scriptImport: "",
+      scriptImport: this.imports.join("\n"),
       globalCode: this.globalCode.join("\n"),
       topLevelCode: this.topLevelCode.join("\n"),
-      runCode: this.code.join("\n"),
+      runCode: useAppendCode ? [...this.code, ...this.appendCode].join("\n") : this.code.join("\n"),
     });
     return this.source;
   }
@@ -178,13 +193,14 @@ export class Source {
 
   async compile() {
     if (this.compiled) return this.compiled;
-    const source = this.toContractSource();
+    const source = this.toContractSource(true);
+    console.log(this, source)
     const compiled = (await solidityCompiler({
       version: `https://binaries.soliditylang.org/bin/${VERSION}`,
       contractBody: source,
     }));
     this.compiled = compiled as CompiledContract;
-    if (this.compiled.errors.filter((e) => e.severity === "error").length > 0) {
+    if (this.compiled.errors && this.compiled.errors.filter((e) => e.severity === "error").length > 0) {
       throw this.compiled
     }
 
@@ -211,9 +227,8 @@ export class Source {
       new Map([[0, this.source]]), false)
   }
 
-  async compileWithCode(codeRaw: string[]) {
-    const source = this.clone()
-    source.pushExecCode(codeRaw)
+  async compileWithCode() {
+    const source = this.rawClone()
     await source.compile()
     return source
   }
@@ -226,23 +241,19 @@ export class Source {
  * @param codeRaw 
  */
   async tryCompileNewCode(codeRaw: string[]): Promise<CompiledResult> {
-    const code = await this.checkTypeWithCode(codeRaw)
-    if (code.type === CodeType.DisplayDeclaration) {
-      // Replace the last line into inspector
-      const name = code.displayExpression!.trim()
-      codeRaw[codeRaw.length - 1] = `bytes memory inspectoor = abi.encode(${name});`
-      const newCode = await this.compileWithCode(codeRaw)
+    const result = await this.checkTypeWithCode(codeRaw)
+    this.sourceType = result.type
+    if (result.type === SourceType.VariableDeclaration) {
       return {
         type: SourceType.VariableDeclaration,
-        source: newCode,
-        variableMeta: {
-          name
-        }
+        source: await this.compileWithCode(),
+        variableMeta: result.variableMeta
       }
     }
+
     return {
       type: SourceType.Normal,
-      source: await this.compileWithCode(codeRaw),
+      source: await this.compileWithCode(),
     }
   }
 
@@ -252,96 +263,59 @@ export class Source {
  * @param source 
  * @param codeRaw 
  */
-  private async checkTypeWithCode(codeRaw: string[]): Promise<CompileResult> {
-    // TODO:添加函数和导入的判断，还有合约内变量的判断
-    // 修改为三段式注释
+  public async checkTypeWithCode(codeRaw: string[]): Promise<{
+    type: SourceType,
+
+    variableMeta?: {
+      name: string
+    }
+  }> {
+
+    // Import
+    if (codeRaw[0].startsWith("import")) {
+      this.pushImport(codeRaw)
+      return {
+        type: SourceType.Normal
+      }
+    }
     // 开头为:TopLevelCode 放在外部执行
     if (codeRaw[0].startsWith("//:TopLevelCode")) {
+      this.pushTopLevelCode(codeRaw.slice(1))
       return {
-        type: CodeType.TopLevelDeclaration,
-        code: codeRaw,
-        source: this
+        type: SourceType.Normal
       }
     }
     // 开头为:GlobalCode 放在顶部执行
     if (codeRaw[0].startsWith("//:GlobalCode")) {
+      this.pushGlobalCode(codeRaw.slice(1))
       return {
-        type: CodeType.GlobalDeclaration,
-        code: codeRaw,
-        source: this
+        type: SourceType.Normal
       }
     }
+    // for (const code of codeRaw) {
+    //   if (code.startsWith("//")) continue
+    //   if (code.startsWith("pragma"))
+
+    // }
     // 默认为RunCode，如果结尾不是分号，自动的转换成VariableDeclaration，获取最后得到的值
     if (codeRaw[codeRaw.length - 1].endsWith(";")) {
+      this.pushExecCode(codeRaw)
       return {
-        type: CodeType.Normal,
-        code: codeRaw,
-        source: this
+        type: SourceType.Normal
       }
     }
 
+    const name = codeRaw[codeRaw.length - 1].trim()
+    const appendCode = `bytes memory inspectoor = abi.encode(${name});`
+    this.pushExecCode(codeRaw.slice(0, -1))
+    this.setAppendCode([appendCode])
+
     return {
-      type: CodeType.DisplayDeclaration,
-      code: codeRaw.slice(0, codeRaw.length - 1),
-      displayExpression: codeRaw[codeRaw.length - 1],
-      source: this
+      type: SourceType.VariableDeclaration,
+      variableMeta: {
+        name
+      }
     }
-    // const code = codeRaw.join("\n").trim().split("\n")
-
-    // let compileError = null
-    // let hasModified = false
-    // let newSource!: Source;
-
-    // if (code.length == 0) {
-    //   return {
-    //     type: CodeType.Empty,
-    //     code: code,
-    //     source: this
-    //   }
-    // }
-
-    // for (let i = 0; i < 2; i++) {
-    //   try {
-    //     newSource = await this.clone().compileWithCode(code)
-    //     compileError = null
-    //     if (!hasModified) {
-    //       return {
-    //         type: CodeType.Normal,
-    //         code: code,
-    //         source: newSource
-    //       }
-    //     }
-    //     break
-    //   } catch (e) {
-    //     compileError = e
-    //     code[code.length - 1] += ";"
-    //     hasModified = true
-    //   }
-    // }
-
-    // if (compileError) {
-    //   throw compileError
-    // }
-
-    // // This logic only for variable declaration check
-    // const { contractNode, functionNode } = getRunFunction(newSource.compiled!)
-
-    // const statements = functionNode.body!.statements!
-    // const lastStatement = statements[statements.length - 1]
-    // if (lastStatement.nodeType === "ExpressionStatement" && lastStatement.expression!.nodeType === "Identifier") {
-    //   return {
-    //     type: CodeType.VariableDeclaration,
-    //     code: code,
-    //     source: newSource,
-    //     variableExpressionStatement: lastStatement
-    //   }
-    // }
-
-    // return {
-    //   type: CodeType.Normal,
-    //   code: code,
-    //   source: newSource
-    // }
   }
 
   hasError() {

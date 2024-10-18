@@ -1,9 +1,9 @@
-import { TypeDescriptions, VariableDeclaration } from "solidity-ast"
+import { TypeDescriptions } from "solidity-ast"
 import { SolcOutput } from "solidity-ast/solc"
 
 export enum SourceType {
   Normal,
-  VariableDeclaration
+  VariableDeclaration,
 }
 
 export enum CodeType {
@@ -11,6 +11,7 @@ export enum CodeType {
   DisplayDeclaration,
   TopLevelDeclaration,
   GlobalDeclaration,
+  ImportDeclaration,
   Empty
 }
 

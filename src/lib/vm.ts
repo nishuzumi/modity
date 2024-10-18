@@ -2,7 +2,7 @@ import { Chain, Common } from "@ethereumjs/common";
 import { VM } from "@ethereumjs/vm";
 import { Address, Account } from "@ethereumjs/util";
 import { ExecResult } from "@ethereumjs/evm";
-import { decodeAbiParameters, fromBytes } from "viem";
+import { fromBytes } from "viem";
 import { Source } from "./source";
 
 export const VM_ADDRESS = Address.fromString("0xffffffffffffffffffff00000000000000000000");
@@ -16,6 +16,7 @@ export class EthVM {
     const vm = new EthVM();
     vm.vm = await VM.create({
       common: new Common({ chain: Chain.Mainnet }),
+      
     })
     return vm;
   }

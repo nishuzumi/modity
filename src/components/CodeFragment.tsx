@@ -1,11 +1,14 @@
-import { CompileError, DecodeVariableResult, VariableMeta } from "@/lib/types";
+import { CompileError, DecodeVariableResult } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { solidity } from "@replit/codemirror-lang-solidity";
 import { tokyoNightDay } from "@uiw/codemirror-theme-tokyo-night-day";
 import CodeMirror, { EditorView } from "@uiw/react-codemirror";
 import { atom, PrimitiveAtom, useAtomValue, useSetAtom } from "jotai";
 import { useImmerAtom } from "jotai-immer";
+import { useEffectOnce } from "react-use";
 import { FragmentData, RunnedStatus } from "./CodeContent";
+import { useRef } from "react";
+import { result } from "lodash";
 
 type CodeFragmentProps = {
   index: number;
@@ -28,7 +31,6 @@ const focusTheme = EditorView.theme({
   },
 });
 
-
 export const GlobalSelect = atom<number | undefined>();
 GlobalSelect.debugLabel = "GlobalSelect";
 
@@ -40,7 +42,22 @@ export default function CodeFragment({
   const [fragment, setFragment] = useImmerAtom(fragmentAtom);
   fragmentAtom.debugLabel = "FragmentAtomsAtom:" + index;
 
+  const domRef = useRef<HTMLDivElement>(null);
   const setActive = useSetAtom(GlobalSelect);
+
+  useEffectOnce(() => {
+    setFragment((draft) => {
+      draft.scrollTo = (position: "code" | "result" = "result") => {
+        if (domRef.current) {
+          const target = position === "result" ? domRef.current.querySelector(".view-tag"): domRef.current;
+          target?.scrollIntoView({
+            behavior: "smooth",
+            block:"end"
+          });
+        }
+      };
+    });
+  });
 
   const onChange = (value: string) => {
     setFragment((fragment) => {
@@ -48,10 +65,10 @@ export default function CodeFragment({
       fragment.runned = RunnedStatus.NotRunned;
     });
   };
-  
+
   return (
-    <div onClick={() => setActive(index)} className={className}>
-      <div className="flex mb-2">
+    <div ref={domRef} onClick={() => setActive(index)} className={className}>
+      <div className="fragment-code flex mb-2">
         <div className="flex w-full ">
           <CodeFragmentHeader index={index} type={"input"} />
           <CodeMirror
@@ -69,17 +86,20 @@ export default function CodeFragment({
         </div>
       </div>
       {fragment.result?.value !== undefined ? (
-        <div className="flex mt-2">
+        <div className="fragment-result flex mt-2">
           <CodeFragmentHeader index={index} type={"output"} />
           <RenderResult {...fragment.result} />
         </div>
-      ):""}
+      ) : (
+        ""
+      )}
       {fragment.error && (
-        <div className="flex mt-2">
+        <div className="fragment-result flex mt-2">
           <CodeFragmentHeader index={index} type={"error"} />
           <ErrorMessage error={fragment.error} />
         </div>
       )}
+      <div className="view-tag"/>
     </div>
   );
 }
@@ -105,7 +125,7 @@ export function ErrorMessage({ error }: { error: CompileError[] }) {
   );
 }
 
-export function RenderResult({variable, value}: DecodeVariableResult) {
+export function RenderResult({ variable, value }: DecodeVariableResult) {
   if (!variable || value === undefined) return "";
   return (
     <div className="grid grid-cols-[auto,1fr] gap-x-4 text-sm font-mono">

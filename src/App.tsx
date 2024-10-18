@@ -10,8 +10,11 @@ const App: React.FC = () => {
     <div className="flex flex-col h-screen justify-between bg-background">
       <Header />
       <ToolsBar />
-      <div className="m-4 h-full bg-white border">
+      <div className="overflow-scroll flex-1">
+      <div className="m-4 bg-white border">
         <CodeContent />
+      </div>
+
       </div>
       <Footer />
       <DevTools />
