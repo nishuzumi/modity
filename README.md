@@ -2,8 +2,7 @@
 
 Modity is a browser-based Jupyter Notebook-like environment for Solidity, providing an interactive development experience specifically for writing and testing smart contracts. Additionally, Modity offers the capability to interact with EVM-compatible public blockchains, allowing developers to write, test, and deploy smart contracts directly in their web browser.
 
-## Contributor
-
+![alt text](assets/image.png)
 
 ## Features
 
