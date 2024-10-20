@@ -39,7 +39,7 @@ Run `bun run build` to create a production build.
 - [x] Fragment Runtime
 - Notebook
   - [ ] Drag & Drop
-  - [ ] Running Index
+  - [X] Running Index
   - [x] Variable Inspection
   - [x] Result Display
   - [ ] Code Snippet Management

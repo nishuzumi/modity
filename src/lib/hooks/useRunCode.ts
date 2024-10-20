@@ -1,4 +1,4 @@
-import { FragmentData, FragmentsAtom, FragmentSnapshot, FragmentsSnapshot, LastFragmentSnapshot, RunnedStatus } from "@/components/CodeContent";
+import { FragmentData, FragmentsAtom, FragmentSnapshot, FragmentsSnapshot, LastFragmentSnapshot, RunIndexAtom, RunnedStatus } from "@/components/CodeContent";
 import { useAtomCallback } from "jotai/utils";
 import { useCallback } from "react";
 import { Source } from "../source";
@@ -16,6 +16,7 @@ export const useRunCode = () => {
       if (index === undefined) return;
       const fragments = get(FragmentsAtom);
       const lastFragment = get(LastFragmentSnapshot);
+      const runIndex = get(RunIndexAtom);
       const fragment = fragments[index];
       const setFragment = (index: number, cb: (draft: FragmentData) => void) => {
         set(FragmentsAtom, (draft) => {
@@ -26,7 +27,6 @@ export const useRunCode = () => {
       const source = getSource(lastFragment);
 
       setFragment(index, (draft) => {
-        draft.runned = RunnedStatus.Running;
         draft.result = undefined;
         draft.error = undefined;
       })
@@ -64,7 +64,8 @@ export const useRunCode = () => {
               fragment.detailCode!.runnableCode = fragment.code;
               break;
           }
-          draft[index].runned = RunnedStatus.Success;
+          fragment.runIndex = runIndex;
+          set(RunIndexAtom, runIndex + 1);
           set(FragmentsSnapshot, (draft) => {
             return [...draft, {
               ...fragment,
@@ -81,7 +82,6 @@ export const useRunCode = () => {
         if ((e as CompiledContract).errors) {
           set(FragmentsAtom, (draft) => {
             draft[index].error = (e as CompiledContract).errors;
-            draft[index].runned = RunnedStatus.Error;
           });
         }
       }

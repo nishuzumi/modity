@@ -21,7 +21,7 @@ export enum RunnedStatus {
 export type FragmentData = {
   uuid: string;
   code: string;
-  runned: RunnedStatus;
+  runIndex?: number;
   detailCode?: FragmentCodeDetail;
   result?: DecodeVariableResult;
   error?: CompileError[];
@@ -31,6 +31,9 @@ export type FragmentData = {
 export type FragmentSnapshot = FragmentData & {
   source: Source;
 };
+
+export const RunIndexAtom = atom<number>(1);
+RunIndexAtom.debugLabel = "RunIndexAtom";
 
 export const FragmentsSnapshot = atom<FragmentSnapshot[]>([]);
 FragmentsSnapshot.debugLabel = "FragmentsSnapshot";
@@ -47,7 +50,6 @@ export const FragmentsAtom = atomWithImmer<FragmentData[]>([
   {
     uuid: nanoid(),
     code: "uint x = 10;\nx",
-    runned: RunnedStatus.NotRunned,
   },
   {
     uuid: nanoid(),
@@ -216,8 +218,7 @@ contract A is ERC20{
     uuid: nanoid(),
     code: `A a = new A();
 a.balanceOf(address(this))`,
-    runned: RunnedStatus.NotRunned,
-  },
+  }
 ]);
 FragmentsAtom.debugLabel = "FragmentsAtom";
 

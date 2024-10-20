@@ -45,6 +45,8 @@ export default function CodeFragment({
   const domRef = useRef<HTMLDivElement>(null);
   const setActive = useSetAtom(GlobalSelect);
 
+  const runIndex = fragment.runIndex
+
   useEffectOnce(() => {
     setFragment((draft) => {
       draft.scrollTo = (position: "code" | "result" = "result") => {
@@ -62,7 +64,6 @@ export default function CodeFragment({
   const onChange = (value: string) => {
     setFragment((fragment) => {
       fragment.code = value;
-      fragment.runned = RunnedStatus.NotRunned;
     });
   };
 
@@ -70,7 +71,7 @@ export default function CodeFragment({
     <div ref={domRef} onClick={() => setActive(index)} className={className}>
       <div className="fragment-code flex mb-2">
         <div className="flex w-full ">
-          <CodeFragmentHeader index={index} type={"input"} />
+          <CodeFragmentHeader index={runIndex} type={"input"} />
           <CodeMirror
             className="flex-grow"
             value={fragment.code}
@@ -87,7 +88,7 @@ export default function CodeFragment({
       </div>
       {fragment.result?.value !== undefined ? (
         <div className="fragment-result flex mt-2">
-          <CodeFragmentHeader index={index} type={"output"} />
+          <CodeFragmentHeader index={runIndex} type={"output"} />
           <RenderResult {...fragment.result} />
         </div>
       ) : (
@@ -95,7 +96,7 @@ export default function CodeFragment({
       )}
       {fragment.error && (
         <div className="fragment-result flex mt-2">
-          <CodeFragmentHeader index={index} type={"error"} />
+          <CodeFragmentHeader index={runIndex} type={"error"} />
           <ErrorMessage error={fragment.error} />
         </div>
       )}
@@ -125,8 +126,19 @@ export function ErrorMessage({ error }: { error: CompileError[] }) {
   );
 }
 
+function parseValue({ variable, value }: DecodeVariableResult) {
+  if (typeof value === "bigint") {
+    return value;
+  }
+
+  if(variable.typeDescriptions.typeString === "address") {
+    return BigInt(value as string)
+  }
+}
+
 export function RenderResult({ variable, value }: DecodeVariableResult) {
   if (!variable || value === undefined) return "";
+  console.log(variable,value)
   return (
     <div className="grid grid-cols-[auto,1fr] gap-x-4 text-sm font-mono">
       <span className="">Type</span>
@@ -138,13 +150,19 @@ export function RenderResult({ variable, value }: DecodeVariableResult) {
       <span className="text-gray-700">Hex</span>
       <span className="inline text-red-700">
         <span className="text-gray-700">: </span>
-        {typeof value === "bigint" ? "0x" + value.toString(16) : "不适用"}
+        {parseValue({variable,value})!.toString(16)}
       </span>
 
       <span className="text-gray-700">Decimal</span>
       <span className="inline text-red-700">
         <span className="text-gray-700">: </span>
-        {typeof value === "bigint" ? value.toString(10) : "不适用"}
+        {parseValue({variable,value})!.toString(10)}
+      </span>
+
+      <span className="text-gray-700">String</span>
+      <span className="inline text-red-700">
+        <span className="text-gray-700">: </span>
+        {typeof value === "string" ? value : "Unknown"}
       </span>
     </div>
   );
@@ -157,7 +175,7 @@ const CodeFragmentHeaderColor: Record<CodeFragmentType, string> = {
 };
 
 type CodeFragmentHeaderProps = {
-  index: number;
+  index?: number;
   type: CodeFragmentType;
 };
 
@@ -178,7 +196,7 @@ function CodeFragmentHeader({ index, type }: CodeFragmentHeaderProps) {
           "leading-5"
         )}
       >
-        [{index}]:{" "}
+        [{index ?? " "}]:{" "}
       </div>
     </>
   );

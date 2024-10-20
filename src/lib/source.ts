@@ -285,6 +285,12 @@ export class Source {
         type: SourceType.Normal
       }
     }
+    if (codeRaw[0].startsWith("function")){
+      this.pushTopLevelCode(codeRaw)
+      return {
+        type: SourceType.Normal
+      }
+    }
     // 开头为:GlobalCode 放在顶部执行
     if (codeRaw[0].startsWith("//:GlobalCode")) {
       this.pushGlobalCode(codeRaw.slice(1))
