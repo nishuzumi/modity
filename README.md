@@ -48,7 +48,7 @@ Run `bun run build` to create a production build.
   - [ ] Notebook Sharing (Export, Import)
   - [ ] Notebook History (Undo, Redo)
   - [ ] Notebook Template
-  - [ ] Memory And Stack Inspection
+  - [ ] Memory And Stack Inspection (WIP)
   - [ ] Bytecode Inspection
   - [ ] Assembly Inspection
   - [ ] Call Tree Inspection
