@@ -64,6 +64,11 @@ Run `bun run build` to create a production build.
   - [ ] VM Execution Trace
   - [ ] VM Human-readable variables analysis
   - [ ] VM Log Analysis
+- Interfaces
+  - [ ] Connect to Wallet
+  - [ ] Save & Load
+  - [ ] Open Github Gist or raw Github URL
+  - [ ] Fold and unfold CodeFragment
 
 ## License
 
