@@ -3,12 +3,27 @@ import { cn } from "@/lib/utils";
 import { solidity } from "@replit/codemirror-lang-solidity";
 import { tokyoNightDay } from "@uiw/codemirror-theme-tokyo-night-day";
 import CodeMirror, { EditorView } from "@uiw/react-codemirror";
-import { atom, PrimitiveAtom, useAtomValue, useSetAtom } from "jotai";
+import {
+  Atom,
+  atom,
+  PrimitiveAtom,
+  useAtom,
+  useAtomValue,
+  useSetAtom,
+} from "jotai";
 import { useImmerAtom } from "jotai-immer";
 import { useEffectOnce } from "react-use";
 import { FragmentData, RunnedStatus } from "./CodeContent";
-import { useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import { result } from "lodash";
+import {
+  ChevronRight,
+  ChevronDown,
+  UnfoldVertical,
+  FoldVertical,
+  ChevronsDownUp,
+  ChevronsUpDown,
+} from "lucide-react";
 
 type CodeFragmentProps = {
   index: number;
@@ -45,16 +60,31 @@ export default function CodeFragment({
   const domRef = useRef<HTMLDivElement>(null);
   const setActive = useSetAtom(GlobalSelect);
 
-  const runIndex = fragment.runIndex
+  const runIndex = fragment.runIndex;
+
+  // 是否折叠
+  const isCollapsedAtom = useMemo(() => atom(false), []);
+  const isCollapsed = useAtomValue(isCollapsedAtom);
+
+  const truncateCode = (code: string, maxLength: number) => {
+    return code.replace(/\n/g, " ").slice(0, maxLength) + "...";
+  };
+
+  const code = useMemo(() => {
+    return isCollapsed ? truncateCode(fragment.code, 100) : fragment.code;
+  }, [fragment.code, isCollapsed]);
 
   useEffectOnce(() => {
     setFragment((draft) => {
       draft.scrollTo = (position: "code" | "result" = "result") => {
         if (domRef.current) {
-          const target = position === "result" ? domRef.current.querySelector(".view-tag"): domRef.current;
+          const target =
+            position === "result"
+              ? domRef.current.querySelector(".view-tag")
+              : domRef.current;
           target?.scrollIntoView({
             behavior: "smooth",
-            block:"end"
+            block: "end",
           });
         }
       };
@@ -68,13 +98,21 @@ export default function CodeFragment({
   };
 
   return (
-    <div ref={domRef} onClick={() => setActive(index)} className={className}>
+    <div
+      ref={domRef}
+      onClick={() => setActive(index)}
+      className={cn([className, "group"])}
+    >
       <div className="fragment-code flex mb-2">
         <div className="flex w-full ">
-          <CodeFragmentHeader index={runIndex} type={"input"} />
+          <CodeFragmentHeader
+            index={runIndex}
+            type={"input"}
+            isCollapsedAtom={isCollapsedAtom}
+          />
           <CodeMirror
             className="flex-grow"
-            value={fragment.code}
+            value={code}
             theme={tokyoNightDay}
             basicSetup={{
               lineNumbers: false,
@@ -100,7 +138,7 @@ export default function CodeFragment({
           <ErrorMessage error={fragment.error} />
         </div>
       )}
-      <div className="view-tag"/>
+      <div className="view-tag" />
     </div>
   );
 }
@@ -131,14 +169,14 @@ function parseValue({ variable, value }: DecodeVariableResult) {
     return value;
   }
 
-  if(variable.typeDescriptions.typeString === "address") {
-    return BigInt(value as string)
+  if (variable.typeDescriptions.typeString === "address") {
+    return BigInt(value as string);
   }
 }
 
 export function RenderResult({ variable, value }: DecodeVariableResult) {
   if (!variable || value === undefined) return "";
-  console.log(variable,value)
+  console.log(variable, value);
   return (
     <div className="grid grid-cols-[auto,1fr] gap-x-4 text-sm font-mono">
       <span className="">Type</span>
@@ -150,13 +188,13 @@ export function RenderResult({ variable, value }: DecodeVariableResult) {
       <span className="text-gray-700">Hex</span>
       <span className="inline text-red-700">
         <span className="text-gray-700">: </span>
-        {parseValue({variable,value})!.toString(16)}
+        {parseValue({ variable, value })!.toString(16)}
       </span>
 
       <span className="text-gray-700">Decimal</span>
       <span className="inline text-red-700">
         <span className="text-gray-700">: </span>
-        {parseValue({variable,value})!.toString(10)}
+        {parseValue({ variable, value })!.toString(10)}
       </span>
 
       <span className="text-gray-700">String</span>
@@ -177,18 +215,55 @@ const CodeFragmentHeaderColor: Record<CodeFragmentType, string> = {
 type CodeFragmentHeaderProps = {
   index?: number;
   type: CodeFragmentType;
+  isCollapsedAtom?: PrimitiveAtom<boolean>;
 };
 
-function CodeFragmentHeader({ index, type }: CodeFragmentHeaderProps) {
+function CodeFragmentHeader({
+  index,
+  type,
+  isCollapsedAtom,
+}: CodeFragmentHeaderProps) {
+  const [isCollapsed, setIsCollapsed] = useAtom(isCollapsedAtom ?? atom(false));
   const active = useAtomValue(GlobalSelect);
+
+  const toggleCollapse = () => {
+    setIsCollapsed(!isCollapsed);
+  };
+
   return (
     <>
       <div
         className={cn(
-          "w-2 mr-8 h-auto transition-colors duration-500",
-          active === index ? "bg-blue-500" : "bg-transparent"
+          "w-2 mr-4 h-auto transition-colors duration-500",
+          active === index && !!index ? "bg-blue-500" : "bg-transparent"
         )}
       ></div>
+      {isCollapsedAtom ? (
+        <button
+          onClick={toggleCollapse}
+          className={cn(
+            "top-1 opacity-0 group-hover:opacity-100 transition-opacity flex pt-1 mr-4 relative w-[15px] h-[15px]",
+            isCollapsed ? "opacity-100" : "opacity-0"
+          )}
+        >
+          <div
+            className={`absolute inset-0 transition-all duration-300 ${
+              isCollapsed ? "opacity-100" : "opacity-0"
+            }`}
+          >
+            <ChevronsUpDown size={15} />
+          </div>
+          <div
+            className={`absolute inset-0 transition-all duration-300 ${
+              isCollapsed ? "opacity-0" : "opacity-100"
+            }`}
+          >
+            <ChevronsDownUp size={15} />
+          </div>
+        </button>
+      ) : (
+        ""
+      )}
       <div
         className={cn(
           "mt-[2px] mr-4 text-xs font-mono",

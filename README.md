@@ -68,7 +68,7 @@ Run `bun run build` to create a production build.
   - [ ] Connect to Wallet
   - [ ] Save & Load
   - [ ] Open Github Gist or raw Github URL
-  - [ ] Fold and unfold CodeFragment
+  - [x] Fold and unfold CodeFragment
 
 ## License
 
