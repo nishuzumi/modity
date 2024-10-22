@@ -69,6 +69,7 @@ Run `bun run build` to create a production build.
   - [ ] Save & Load
   - [ ] Open Github Gist or raw Github URL
   - [x] Fold and unfold CodeFragment
+- [ ] VSCode Extension
 
 ## License
 
