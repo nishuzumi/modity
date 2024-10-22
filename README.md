@@ -4,6 +4,10 @@ Modity is a browser-based Jupyter Notebook-like environment for Solidity, provid
 
 ![alt text](assets/image.png)
 
+> [!IMPORTANT]
+> Modity is currently under heavy development.
+
+
 ## Features
 
 - Smart contract editing and compilation
